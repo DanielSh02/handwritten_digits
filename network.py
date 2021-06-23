@@ -94,5 +94,16 @@ class Network:
                         desired[L - 1][k] += self.weights_matrices[L - 1][j][k] * nodes[L][j] * (1 - nodes[L][j]) * 2 * (nodes[L][j] - desired[L][j])
         return wadjs, badjs
 
-
+    def batch_backpropagaqte(self, batch):
+        N = len(batch)
+        wadjs = self.weights[0:]
+        badjs = self.biases[0:]
+        for image in batch:
+            wadjs_add, badjs_add = self.img_backpropagate(image)
+            for i in range(3):
+                wadjs[i] = np.add(wadjs[i], wadjs_add[i])
+                badjs[i] = np.add(badjs[i], badjs_add[i])
+        for i in range(3):
+            self.weights_matrices[i] = np.add(self.weights_matrices[i], wadjs[i] / N)
+            self.bias_matrices[i] = np.add(self.bias_matrices[i], badjs[i] / N)
 
