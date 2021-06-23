@@ -39,7 +39,7 @@ class Network:
             for i in range(len(biases)):
                 biases[i] = randint(1, 100) / 1000
 
-    def evaluate(self, image):
+    def evaluate(self, image) -> list[int]:
         layers = [None] * 4
         layers[0] = image
         for i in range(3):
@@ -49,10 +49,19 @@ class Network:
             layers[i + 1] = msigmoid(np.add(np.matmul(self.weights_matrices[i], layers[i]), self.bias_matrices[i]))
         return layers[-1]
 
-    def cost(self, image):
+    def cost(self, image) -> int:
         cost = 0
         output = self.evaluate(image)
-        correct = 0 # TODO: Match with label
+        correct = 100 # TODO: Match with label
         for i in range(10):
             if i == correct:
-                cost += (1 - output[i])
+                cost += (1 - output[i]) ** 2
+            else:
+                cost += output[i] ** 2
+        return cost
+
+    def batch_cost(self, batch) -> int:
+        total_cost = 0
+        for image in batch:
+            total_cost += self.cost(image)
+        return total_cost
