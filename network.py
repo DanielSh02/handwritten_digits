@@ -10,7 +10,6 @@ def sigmoid(x):
 def msigmoid(array):
     for i in range(len(array)):
         array[i] = sigmoid(array[i])
-    print(array)
     return array
 
 
@@ -49,10 +48,17 @@ class Network:
             layers[i + 1] = msigmoid(np.add(np.matmul(self.weights_matrices[i], layers[i]), self.bias_matrices[i]))
         return layers[-1]
 
+    def evaluate_nodes(self, image):
+        nodes = [None] * 4
+        nodes[0] = image
+        for i in range(3):
+            nodes[i + 1] = msigmoid(np.add(np.matmul(self.weights_matrices[i], nodes[i]), self.bias_matrices[i]))
+        return nodes
+
     def cost(self, image) -> int:
         cost = 0
         output = self.evaluate(image)
-        correct = 100 # TODO: Match with label
+        correct = 100  # TODO: Match with label
         for i in range(10):
             if i == correct:
                 cost += (1 - output[i]) ** 2
@@ -65,3 +71,28 @@ class Network:
         for image in batch:
             total_cost += self.cost(image)
         return total_cost
+
+    def img_backpropagate(self, image):
+        nodes = self.evaluate_nodes(image)
+        desired = [None] * 4
+        desired[-1] = nodes[-1]
+        wadjs = self.weights[0:]
+        badjs = self.biases[0:]
+        for i in range(3):
+            L = 3 - i
+            for j in range(len(nodes[L])):
+                # Calculate dC/dw
+                for k in range(len(nodes[L - 1])):
+                    wadjs[L][j][k] = nodes[L - 1][k] * nodes[L][j] * (1 - nodes[L][j]) * 2 * (nodes[L][j] - desired[L][j])
+                # Calculate dC/db
+                    badjs[L][j] =  nodes[L][j] * (1 - nodes[L][j]) * 2 * (nodes[L][j] - desired[L][j])
+            if i < 2:
+                # Calculating dC/da_k
+                for k in range(len(nodes[L - 1])):
+                    desired[L - 1][k] = 0
+                    for j in range(len(nodes[L])):
+                        desired[L - 1][k] += self.weights_matrices[L - 1][j][k] * nodes[L][j] * (1 - nodes[L][j]) * 2 * (nodes[L][j] - desired[L][j])
+        return wadjs, badjs
+
+
+
