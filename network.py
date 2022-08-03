@@ -2,100 +2,97 @@ from math import exp
 from random import uniform, sample, shuffle
 import numpy as np
 from numpy import array, add, e, matmul, argmax, empty, copy, zeros
+from data import *
+from utils import *
 
 class Network:
-    def __init__(self):
-        self.weights_matrices = [None] * 3
-        self.bias_matrices = [None] * 3
-        self.initialize_weights()
-        self.randomize_weights()
+    def __init__(self, hidden_layers, labels, raw, learning_rate = 0.1, batch_size = 20, print_statements = True):
+        # Data Set
+        self.data_set = DataSet(raw)
 
-    def initialize_weights(self):
-        self.weights_matrices[0] = np.zeros((16, 784))
-        self.weights_matrices[1] = np.zeros((16, 16))
-        self.weights_matrices[2] = np.zeros((10, 16))
+        # Layers
+        self.layers = [Layer(self.data_set.input_len)]
+        for i in range(len(hidden_layers)):
+            self.layers.append(HiddenLayer(hiddenlayers[i], self.layers[-1]))
+        self.layers.append(OutputLayer(self.layers[-1], labels))
 
-        self.bias_matrices[0] = np.zeros(16)
-        self.bias_matrices[1] = np.zeros(16)
-        self.bias_matrices[2] = np.zeros(10)
+        # Weights and biases
+        self.weights = [[]] + [layer.weights for layer in self.layers[1:]]
+        self.biases = [[]] + [layer.biases for layer in self.layers[1:]]
+        self.zs = [[]] + [layer.zs for layer in self.layers[1:]]
+        self.nodes = [layer.nodes for layer in self.layers]
+        self.w_batch = []
+        self.b_batch = []
+        self.counter = 1
 
-    def randomize_weights(self):
-        for weights in self.weights_matrices:
-            for row in weights:
-                for i in range(len(row)):
-                    row[i] = randint(1, 100) / 1000
-        for biases in self.bias_matrices:
-            for i in range(len(biases)):
-                biases[i] = randint(1, 100) / 1000
+        # Batches
+        self.batch_cost = 0
+        self.batch = []
 
-    def evaluate(self, image) -> list[int]:
-        layers = [None] * 4
-        layers[0] = image
-        for i in range(3):
-            # print('Evaluating layer: ' + str(i))
-            # print(self.weights_matrices[i])
-            # print(layers[i])
-            layers[i + 1] = msigmoid(np.add(np.matmul(self.weights_matrices[i], layers[i]), self.bias_matrices[i]))
-        return layers[-1]
+        # Training configuration
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
+        self.learning_rate = self.learning_rate / self.batch_size
+        self.print_statements = print_statements
 
-    def evaluate_nodes(self, image):
-        nodes = [None] * 4
-        nodes[0] = image
-        for i in range(3):
-            nodes[i + 1] = msigmoid(np.add(np.matmul(self.weights_matrices[i], nodes[i]), self.bias_matrices[i]))
-        return nodes
+    def run(self, data):
+        self.layers[0].nodes = array([data]).transpose()
+        for layer in self.layers:
+            layer.eval()
+        return self.layers[-1].result, self.layers[-1].confidence
 
-    def cost(self, image) -> int:
-        cost = 0
-        output = self.evaluate(image)
-        correct = 100  # TODO: Match with label
-        for i in range(10):
-            if i == correct:
-                cost += (1 - output[i]) ** 2
-            else:
-                cost += output[i] ** 2
-        return cost
+    def train(self, epochs):
+        dataset_size = len(self.data_set)
+        for i in range(epochs):
+            self.data_set.idx = 0
+            self.data_set.shuffle()
+            while True:
+                data, actual = next(self.data_set)
+                self.run(data)
+                self.calc_change(actual)
+                if not self.data_set.idx % self.batch_size:
+                    self.backprop()
+                    if self.print_statements:
+                        print(f'Epoch: {i}')
+                        print(actual, self.layers[-1].result, self.layers[-1].nodes)
+                if self.data_set.idx >= dataset_size:
+                    break
 
-    def batch_cost(self, batch) -> int:
-        total_cost = 0
-        for image in batch:
-            total_cost += self.cost(image)
-        return total_cost
+    def calc_change(self, actual):
+        n = len(self.layers)
+        desired = array([[1 if i == actual else 0 for i in labels]]).transpose()
+        weight_changes = [zeroes(array(w).shape) for w in self.weights]
+        bias_changes = [zeroes(array(b).shape) for b in self.biases]
+        dCdz = np.multiply(dsig(z), self.layers[-1].nodes - desired)
+        bias_changes[-1] = dCdz
+        weight_changes[-1] = self.layers[-2].nodes.transpose()
+        for i in range(n - 2, 0, -1):
+            z = self.zs[i]
+            dCdz = np.multiply(dsig(z), self.weights[i + 1].transpose() @ dCdz)
+            weight_changes[i] = dCdz @ self.nodes[i - 1].transpose()
+            bias_changes[i] = dCdz
 
-    def img_backpropagate(self, image):
-        nodes = self.evaluate_nodes(image)
-        desired = [None] * 4
-        desired[-1] = nodes[-1]
-        wadjs = self.weights[0:]
-        badjs = self.biases[0:]
-        for i in range(3):
-            L = 3 - i
-            for j in range(len(nodes[L])):
-                # Calculate dC/dw
-                for k in range(len(nodes[L - 1])):
-                    wadjs[L][j][k] = nodes[L - 1][k] * nodes[L][j] * (1 - nodes[L][j]) * 2 * (nodes[L][j] - desired[L][j])
-                # Calculate dC/db
-                    badjs[L][j] =  nodes[L][j] * (1 - nodes[L][j]) * 2 * (nodes[L][j] - desired[L][j])
-            if i < 2:
-                # Calculating dC/da_k
-                for k in range(len(nodes[L - 1])):
-                    desired[L - 1][k] = 0
-                    for j in range(len(nodes[L])):
-                        desired[L - 1][k] += self.weights_matrices[L - 1][j][k] * nodes[L][j] * (1 - nodes[L][j]) * 2 * (nodes[L][j] - desired[L][j])
-        return wadjs, badjs
+        self.w_batch.append(weight_changes)
+        self.b_batch.append(bias_changes)
+        for i in range(len(self.labels)):
+            self.batch_cost += (self.layers[-1].nodes[i] - desired[i]) ** 2
 
-    def batch_backpropagaqte(self, batch):
-        N = len(batch)
-        wadjs = self.weights[0:]
-        badjs = self.biases[0:]
-        for image in batch:
-            wadjs_add, badjs_add = self.img_backpropagate(image)
-            for i in range(3):
-                wadjs[i] = np.add(wadjs[i], wadjs_add[i])
-                badjs[i] = np.add(badjs[i], badjs_add[i])
-        for i in range(3):
-            self.weights_matrices[i] = np.add(self.weights_matrices[i], wadjs[i] / N)
-            self.bias_matrices[i] = np.add(self.bias_matrices[i], badjs[i] / N)
+    def backprop(self):
+        for i, layer in enumerate(self.layers):
+            if i != 0:
+                for j in range(len(self.w_batch)):
+                    layer.weights = add(layer.weights, -self.learning_rate * array(self.w_batch[j][i]))
+                    layer.biases = add(layer.biases, -self.learning_rate * array(self.b_batch[j][i]))
+        self.w_batch = []
+        self.b_batch = []
+        if self.print_statements:
+            print(f"Batch {self.counter // self.batch_size} average cost: {self.batch_cost / self.batch_size}")
+        self.batch_cost = 0
+
+
+
+
+
 
 class Layer:
     def __init__(self, num_nodes):
