@@ -1,6 +1,7 @@
+from math import exp
+from random import uniform, sample, shuffle
 import numpy as np
-import math
-from random import randint
+from numpy import array, add, e, matmul, argmax, empty, copy, zeros
 
 class Network:
     def __init__(self):
@@ -96,3 +97,32 @@ class Network:
             self.weights_matrices[i] = np.add(self.weights_matrices[i], wadjs[i] / N)
             self.bias_matrices[i] = np.add(self.bias_matrices[i], badjs[i] / N)
 
+class Layer:
+    def __init__(self, num_nodes):
+        self.num_nodes = num_nodes
+        self.nodes = array([0 for i in range(num_nodes)]).tranpose()
+        self.zs = array([0 for i in range(num_nodes)]).transpose()
+
+class HiddenLayer(Layer):
+    def __init__(self, num_nodes, prev_layer):
+        super().__init__(num_nodes)
+        def randizer():
+            return np.random.normal(scale = self.prev_layer.num_nodes ** (-0.5))
+        self.weights = array([[randizer() for i in range(prev_layer.num_nodes)] for j in range(num_nodes)])
+        self.biases = array([[0 for node in range(num_nodes)]]).transpose()
+
+    def eval(self):
+        self.zs = add(self.weights @ self.prev_layer.nodes, self.biases)
+        self.nodes = sigmoid(self.zs)
+
+class OutputLayer(HiddenLayer):
+    def __init__(self, prev_layer, labels):
+        super().__init__(len(labels), prev_layer)
+        self.labels = labels
+        self.result = None
+        self.confidence = None
+
+    def eval(self):
+        super().eval()
+        self.confidence = max(self.nodes)[0]
+        self.result = self.labels[argmax(self.nodes)]
