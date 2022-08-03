@@ -4,6 +4,7 @@ import numpy as np
 from numpy import array, add, e, matmul, argmax, empty, copy, zeros
 from data import *
 from utils import *
+from json import dump
 
 class Network:
     def __init__(self, hidden_layers, labels, raw, learning_rate = 0.1, batch_size = 20, print_statements = True):
@@ -20,7 +21,6 @@ class Network:
         self.weights = [[]] + [layer.weights for layer in self.layers[1:]]
         self.biases = [[]] + [layer.biases for layer in self.layers[1:]]
         self.zs = [[]] + [layer.zs for layer in self.layers[1:]]
-        self.nodes = [layer.nodes for layer in self.layers]
         self.w_batch = []
         self.b_batch = []
         self.counter = 1
@@ -69,7 +69,7 @@ class Network:
         for i in range(n - 2, 0, -1):
             z = self.zs[i]
             dCdz = np.multiply(dsig(z), self.weights[i + 1].transpose() @ dCdz)
-            weight_changes[i] = dCdz @ self.nodes[i - 1].transpose()
+            weight_changes[i] = dCdz @ layer.nodes.transpose()
             bias_changes[i] = dCdz
 
         self.w_batch.append(weight_changes)
@@ -89,8 +89,25 @@ class Network:
             print(f"Batch {self.counter // self.batch_size} average cost: {self.batch_cost / self.batch_size}")
         self.batch_cost = 0
 
+    def unload(self, file):
+        data = {}
+        data["weights"] = self.weights
+        data["biases"] = self.biases
+        with open(file, "w"):
+            json.dump(data, file, indent = 6)
 
+    def load(self, file):
+        data = json.loads(file)
+        self.weights = data["weights"]
+        self.biases = data["biases"]
+        layers_shape = [len(arr) for arr in self.biases[:-1]]
+        print(f"Loading file: {file}. Hidden Layers = {layers_shape}")
 
+        self.layers = [Layer(self.data_set.input_len)]
+        for i in range(len(hidden_layers)):
+            self.layers.append(HiddenLayer(hiddenlayers[i], self.layers[-1]))
+        self.layers.append(OutputLayer(self.layers[-1], self.labels))
+        self.zs = [[]] + [layer.zs for layer in self.layers[1:]]
 
 
 
