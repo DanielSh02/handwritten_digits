@@ -1,6 +1,4 @@
-import scipy.io
-import scipy.stats
-from scipy.special import softmax
+from random import shuffle
 
 class DataSet(list):
     def __init__(self, raw):
