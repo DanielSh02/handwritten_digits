@@ -2,17 +2,6 @@ import numpy as np
 import math
 from random import randint
 
-
-def sigmoid(x):
-    return 1 / (1 + math.exp(-x))
-
-
-def msigmoid(array):
-    for i in range(len(array)):
-        array[i] = sigmoid(array[i])
-    return array
-
-
 class Network:
     def __init__(self):
         self.weights_matrices = [None] * 3
