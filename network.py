@@ -4,7 +4,7 @@ import numpy as np
 from numpy import array, add, e, matmul, argmax, empty, copy, zeros
 from data import *
 from utils import *
-from json import dump
+from json import dump, loads
 
 class Network:
     def __init__(self, hidden_layers, labels, raw, learning_rate = 0.1, batch_size = 20, print_statements = True):
@@ -14,7 +14,7 @@ class Network:
         # Layers
         self.layers = [Layer(self.data_set.input_len)]
         for i in range(len(hidden_layers)):
-            self.layers.append(HiddenLayer(hiddenlayers[i], self.layers[-1]))
+            self.layers.append(HiddenLayer(hidden_layers[i], self.layers[-1]))
         self.layers.append(OutputLayer(self.layers[-1], labels))
 
         # Weights and biases
@@ -60,16 +60,16 @@ class Network:
 
     def calc_change(self, actual):
         n = len(self.layers)
-        desired = array([[1 if i == actual else 0 for i in labels]]).transpose()
-        weight_changes = [zeroes(array(w).shape) for w in self.weights]
-        bias_changes = [zeroes(array(b).shape) for b in self.biases]
-        dCdz = np.multiply(dsig(z), self.layers[-1].nodes - desired)
+        desired = array([[1 if i == actual else 0 for i in self.labels]]).transpose()
+        weight_changes = [zeros(array(w).shape) for w in self.weights]
+        bias_changes = [zeros(array(b).shape) for b in self.biases]
+        dCdz = np.multiply(dsig(self.zs[-1]), self.layers[-1].nodes - desired)
         bias_changes[-1] = dCdz
         weight_changes[-1] = self.layers[-2].nodes.transpose()
         for i in range(n - 2, 0, -1):
             z = self.zs[i]
             dCdz = np.multiply(dsig(z), self.weights[i + 1].transpose() @ dCdz)
-            weight_changes[i] = dCdz @ layer.nodes.transpose()
+            weight_changes[i] = dCdz @ self.layers[i].nodes.transpose()
             bias_changes[i] = dCdz
 
         self.w_batch.append(weight_changes)
@@ -94,18 +94,18 @@ class Network:
         data["weights"] = self.weights
         data["biases"] = self.biases
         with open(file, "w"):
-            json.dump(data, file, indent = 6)
+            dump(data, file, indent = 6)
 
     def load(self, file):
-        data = json.loads(file)
+        data = loads(file)
         self.weights = data["weights"]
         self.biases = data["biases"]
-        layers_shape = [len(arr) for arr in self.biases[:-1]]
-        print(f"Loading file: {file}. Hidden Layers = {layers_shape}")
+        hidden_layers = [len(arr) for arr in self.biases[:-1]]
+        print(f"Loading file: {file}. Hidden Layers = {hidden_layers}")
 
         self.layers = [Layer(self.data_set.input_len)]
         for i in range(len(hidden_layers)):
-            self.layers.append(HiddenLayer(hiddenlayers[i], self.layers[-1]))
+            self.layers.append(HiddenLayer(self.hidden_layers[i], self.layers[-1]))
         self.layers.append(OutputLayer(self.layers[-1], self.labels))
         self.zs = [[]] + [layer.zs for layer in self.layers[1:]]
 
@@ -127,7 +127,7 @@ class HiddenLayer(Layer):
 
     def eval(self):
         self.zs = add(self.weights @ self.prev_layer.nodes, self.biases)
-        self.nodes = sigmoid(self.zs)
+        self.nodes = sig(self.zs)
 
 class OutputLayer(HiddenLayer):
     def __init__(self, prev_layer, labels):
